@@ -36,48 +36,33 @@ io.on("connection", socket => {
   })
   
   socket.on('create lobby', (lobbyId, user) => {
+    console.log(lobbyId, user)
     lobby = new Lobby()
     lobby.owner = user
-    lobby.roomId = lobby
+    lobby.roomId = lobbyId
+    lobby.state = "idle"
     lobby.players = []
     lobby.deck = shuffle(deck)
     lobby.markModified('cards')
     lobby.save()
   })
-  socket.on('join lobby', (roomId, userData) => {
-    user = { ...userData, cards: [] }
+  socket.on('join lobby', (roomId, username) => {
+    user = { username, roll:"villager", owner:false }
     socket.join(roomId)
     Lobby.findOne({ roomId }).then(lobby => {
-      oldUser = lobby.players.reduce((reducer, player) => player.username === userData.username ? player : reducer, {})
-      if (!oldUser._id) {
+      oldUser = lobby.players.reduce((reducer, player) => player.username === user.username ? player : reducer, {})
+      if (!oldUser.username && lobby.state == "idle") {
+        if (user.username === lobby.owner) {
+          user.owner = true
+        }
         lobby.players.push(user)
         lobby.markModified('users')
-        socket.emit('card drawn', user.cards)
         lobby.save()
       }
-      else {
-        socket.emit('card drawn', oldUser.cards)
-
-      }
-      io.to(roomId).emit('add player', lobby.players)
+      
+      io.to(roomId).emit('update players', lobby.players)
     })
   })
-
-  socket.on('draw card', (roomId, userData) => {
-    lobby = Lobby.findOne({ roomId }).then(lobby => {
-      user = lobby.players.reduce((reducer, player) => player._id === userData._id ? player : reducer, {})
-      user.cards.push(lobby.deck.pop())
-      lobby.markModified('players')
-      lobby.markModified('deck')
-      lobby.save().then(lobby => {
-        socket.emit('card drawn', user.cards)
-      })
-
-    })
-  })
-
-  
-
 
   socket.on("disconnect", () => console.log("Client disconnected"));
 });
