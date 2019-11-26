@@ -6,6 +6,7 @@ const lobbySchema = new Schema({
   roomId: String,
   owner: String,
   state: String,
+  numWolves: Number,
 })
 
 module.exports = mongoose.model('Lobby', lobbySchema)

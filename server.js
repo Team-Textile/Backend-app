@@ -47,7 +47,7 @@ io.on("connection", socket => {
     lobby.save()
   })
   socket.on('join lobby', (roomId, username) => {
-    user = { username, roll: "villager", owner: false }
+    user = { username, roll: "villager", owner: false, alive: true }
     socket.join(roomId)
     Lobby.findOne({ roomId }).then(lobby => {
       oldUser = lobby.players.reduce((reducer, player) => player.username === user.username ? player : reducer, {})
@@ -72,7 +72,7 @@ io.on("connection", socket => {
       if (numWolves < 1) {
         numWolves = 1
       }
-
+      lobby.numWolves = numWolves
       for (let i = 0; i < numWolves; i++) {
         let wolf = lobby.players[Math.floor(Math.random() * lobby.players.length)]
         while (wolf.roll === "wolf") {
@@ -93,6 +93,12 @@ io.on("connection", socket => {
     Lobby.findOne({ roomId }).then(lobby => {
       const roll = lobby.players.reduce((reducer, player) => player.username === username? player.roll : reducer,'')
       socket.emit('give identity', roll)
+    })
+  })
+
+  socket.on('get players', (roomId) => {
+    Lobby.findOne({ roomId }).then(lobby => {
+      socket.emit('give players', (lobby.players.filter(player => player.alive )))
     })
   })
 
