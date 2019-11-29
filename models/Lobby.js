@@ -7,6 +7,10 @@ const lobbySchema = new Schema({
   owner: String,
   state: String,
   numWolves: Number,
+  votes: [{
+    player: String,
+    vote: String,
+  }]
 })
 
 module.exports = mongoose.model('Lobby', lobbySchema)
