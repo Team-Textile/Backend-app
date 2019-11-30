@@ -87,29 +87,48 @@ io.on("connection", socket => {
   })
 
   socket.on('check identity', (roomId, username) => {
+    socket.join(roomId)
     Lobby.findOne({ roomId }).then(lobby => {
-      const roll = lobby.players.reduce((reducer, player) => player.username === username? player.roll : reducer,'')
-      socket.emit('give identity', roll)
+      const player = lobby.players.reduce((reducer, player) => player.username === username ? player : reducer, {})
+      socket.emit('give identity', player)
     })
   })
 
   socket.on('get players', (roomId) => {
     Lobby.findOne({ roomId }).then(lobby => {
-      socket.emit('give players', (lobby.players.filter(player => player.alive )))
+      socket.emit('give players', (lobby.players.filter(player => player.alive)))
     })
   })
 
   socket.on('vote', (roomId, username, vote) => {
+    console.log("Vote", username, vote)
     Lobby.findOne({ roomId }).then(lobby => {
-      if(lobby.state === "night") {
-        const roll = lobby.players.reduce((reducer, player) => player.username === username? player.roll : reducer,'')
-        if(roll != "wolf") {
+      if (lobby.state === "night") {
+        const roll = lobby.players.reduce((reducer, player) => player.username === username ? player.roll : reducer, '')
+        if (roll != "wolf") {
           return
         }
       }
-      lobby.votes.push({player: username, vote})
+
+      lobby.votes.push({ player: username, vote })
+      const count = lobby.votes.reduce((reducer, currentVote) => currentVote.vote == vote ? reducer + 1 : reducer, 0)
+      if (count === lobby.numWolves) {
+        lobby.votes = []
+        const dead = lobby.players.reduce((reducer, player) => player.username === vote ? player : reducer, {})
+        dead.alive = false;
+        if (lobby.state === "night") {
+          lobby.state = "day"
+        }
+        else {
+          lobby.state = "night"
+        }
+      }
+      lobby.markModified("players")
       lobby.markModified("votes")
-      lobby.save()
+      lobby.save().then(lobby => {
+        console.log("update")
+        io.to(roomId).emit('update time', lobby.state)
+      })
     })
   })
 
