@@ -28,16 +28,15 @@ const io = socketIo(server);
 
 
 io.on("connection", socket => {
-  console.log("new client connected")
 
   socket.on('create lobby', (lobbyId, user) => {
-    console.log(lobbyId, user)
     lobby = new Lobby()
     lobby.owner = user
     lobby.roomId = lobbyId
     lobby.state = "idle"
     lobby.players = []
     lobby.votes = []
+    lobby.living = 0
     lobby.deck = shuffle(deck)
     lobby.markModified('cards')
     lobby.save()
@@ -53,6 +52,7 @@ io.on("connection", socket => {
           user.owner = true
         }
         lobby.players.push(user)
+        lobby.living += 1
         lobby.markModified('players')
         lobby.save()
       }
@@ -112,10 +112,14 @@ io.on("connection", socket => {
 
       lobby.votes.push({ player: username, vote })
       const count = lobby.votes.reduce((reducer, currentVote) => currentVote.vote == vote ? reducer + 1 : reducer, 0)
-      if (count === lobby.numWolves) {
+      if (lobby.state == "night" ? count === lobby.numWolves : count / lobby.living > .5) {
         lobby.votes = []
         const dead = lobby.players.reduce((reducer, player) => player.username === vote ? player : reducer, {})
         dead.alive = false;
+        lobby.living -= 1
+        if (dead.roll === "wolf") {
+          lobby.numWolves -= 1
+        }
         if (lobby.state === "night") {
           lobby.state = "day"
         }
@@ -129,6 +133,21 @@ io.on("connection", socket => {
         console.log("update")
         io.to(roomId).emit('update time', lobby.state)
       })
+    })
+  })
+
+  socket.on("check win", (roomId, username) => {
+    Lobby.findOne({ roomId }).then(lobby => {
+      const player = lobby.players.reduce((reducer, player) => player.username === username ? player : reducer, {})
+      console.log("found", lobby.numWolves, lobby.living)
+      if (lobby.numWolves === 0 ) {
+        console.log("V wins")
+        socket.emit("villagers win", player.roll)
+      }
+      else if(lobby.living - lobby.numWolves <= lobby.numWolves) {
+        console.log("W Wins")
+        socket.emit("wolves win", player.roll)
+      }
     })
   })
 

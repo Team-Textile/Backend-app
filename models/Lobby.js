@@ -7,6 +7,7 @@ const lobbySchema = new Schema({
   owner: String,
   state: String,
   numWolves: Number,
+  living: Number,
   votes: [{
     player: String,
     vote: String,
